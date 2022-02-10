@@ -1,0 +1,87 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+#  branches:
+#    include: [ "*" ]
+  tags:
+    include: [ "*" ]
+
+# pool:
+#   vmImage: ubuntu-latest
+pool:
+  name: AWS-2
+
+variables:
+  COMPONENT: "frontend"
+
+stages:
+#- stage: "SonarQubeScanSubmit"
+#  displayName: "SonarQube Scan Submit"  # friendly name to display in the UI
+#  jobs:
+#  - job: "SonarQubeScanSubmit"
+#    displayName: "SonarQube Scan Submit"  # friendly name to display in the UI
+#    steps:
+#    - script: |
+#        sonar-scanner -Dsonar.projectKey=${COMPONENT} -Dsonar.sources=.  -Dsonar.host.url=http://172.31.20.242:9000 -Dsonar.login=$(SONAR_TOKEN)
+#      displayName: Sonar Scan
+#
+#- stage: "QualityGateCheck"
+#  displayName: "Quality Gate Check"  # friendly name to display in the UI
+#  condition: succeeded()
+#  jobs:
+#  - job: "QualityGateCheck"
+#    displayName: "Quality Gate Check"  # friendly name to display in the UI
+#    steps:
+#    - script: |
+#        sonar-quality-gate.sh admin admin123 172.31.20.242 ${COMPONENT}
+#      displayName: Sonar Quality Gate Check
+
+- stage: "PrepareArtifacts"
+  displayName: "Prepare Artifacts"  # friendly name to display in the UI
+  condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+  jobs:
+    - job: "PrepareArtifacts"
+      displayName: "Prepare Artifacts"  # friendly name to display in the UI
+      steps:
+        - script: |
+            cp -r static/* $(Build.BinariesDirectory)/.
+          displayName: Prepare Artifacts
+
+- stage: "PublishArtifacts"
+  displayName: "Publish Artifacts"  # friendly name to display in the UI
+  condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+  jobs:
+    - job: "PublishArtifacts"
+      displayName: "Publish Artifacts"  # friendly name to display in the UI
+      steps:
+#        - script: |
+#            cd $(Build.BinariesDirectory)
+#            az artifacts universal publish --organization https://dev.azure.com/zeeshanshaik1203/ --project="Roboshop" --scope project --feed roboshop --name frontend --version $(Build.SourceBranchName) --description "frontend" --path .
+#          displayName: Publish Artifacts
+      - task: UniversalPackages@0
+        inputs:
+          command: 'publish'
+          publishDirectory: '$(Build.BinariesDirectory)'
+          feedsToUsePublish: 'internal'
+          vstsFeedPublish: 'edfd1e0a-eb7c-438d-9305-6cb7feeaacbb/6ae73496-988d-41bb-93d3-1c40b02b4ad5'
+          vstsFeedPackagePublish: 'frontend'
+          versionOption: 'custom'
+          versionPublish: '$(Build.SourceBranchName)'
+
+- stage: "MakeAMI"
+  displayName: "Make AMI"  # friendly name to display in the UI
+  condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+  jobs:
+    - job: "MakeAMI"
+      displayName: "Make AMI"  # friendly name to display in the UI
+      steps:
+        - script: |
+            cd ami
+            terraform init
+            terraform apply -auto-approve -var APP_VERSION=$(Build.SourceBranchName)
+            terraform state rm module.ami.aws_ami_from_instance.ami
+            terraform destroy -auto-approve -var APP_VERSION=$(Build.SourceBranchName)
+          displayName: Make AMI

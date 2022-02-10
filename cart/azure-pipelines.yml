@@ -1,0 +1,29 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+#  branches:
+#    include: [ "*" ]
+  tags:
+    include: [ "*" ]
+
+# pool:
+#   vmImage: ubuntu-latest
+pool:
+  name: AWS-2
+
+variables:
+  COMPONENT: "cart"
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: azure-pipelines-shared-libraries
+
+stages:
+- template: nodejs.yml@templates
+- template: publish-to-azure.yml@templates
+- template: make-ami.yml@templates

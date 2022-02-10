@@ -1,0 +1,4 @@
+@Library('roboshop-library') _
+
+nodejs('catalogue')
+
